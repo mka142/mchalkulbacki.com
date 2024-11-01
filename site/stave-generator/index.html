@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Music Staves Generator</title>
+		<!-- Semantic UI CSS -->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css" />
+	</head>
+	<body>
+		<div class="ui container">
+			<h1 class="ui header" style="padding-top: 1rem">Music Staves Generator</h1>
+			<div class="ui divider"></div>
+			<div class="ui form">
+				<h3>Page settings</h3>
+				<div class="field">
+					<label>Page Size:</label>
+					<select id="pageSizeSelect" class="ui dropdown">
+						<option value="custom">Custom Size</option>
+						<!-- Options will be set dynamically using JavaScript -->
+					</select>
+					<div class="two fields">
+						<div class="field">
+							<label>Page Width (mm):</label>
+							<input type="number" id="pageWidth" class="ui input" min="0" step="1" />
+						</div>
+						<div class="field">
+							<label>Page Height (mm):</label>
+							<input type="number" id="pageHeight" class="ui input" min="0" step="1" />
+						</div>
+					</div>
+				</div>
+				<div class="field">
+					<label>Page Margins (mm):</label>
+					<div class="four fields">
+						<div class="field">
+							<label>Top:</label>
+							<input type="number" id="marginTop" class="ui input" min="0" step="1" value="20" />
+						</div>
+						<div class="field">
+							<label>Right:</label>
+							<input type="number" id="marginRight" class="ui input" min="0" step="1" value="20" />
+						</div>
+
+						<div class="field">
+							<label>Bottom:</label>
+							<input type="number" id="marginBottom" class="ui input" min="0" step="1" value="20" />
+						</div>
+						<div class="field">
+							<label>Left:</label>
+							<input type="number" id="marginLeft" class="ui input" min="0" step="1" value="20" />
+						</div>
+					</div>
+				</div>
+				<h3>Stave settings</h3>
+				<div class="three fields">
+					<div class="field">
+						<label>Stave Size:</label>
+						<select id="staveSizeSelect" class="ui dropdown">
+							<option value="custom">Custom</option>
+							<!-- Options will be set dynamically using JavaScript -->
+						</select>
+					</div>
+					<div class="field">
+						<label>Custom stave Size (mm):</label>
+						<input type="number" id="staveSize" class="ui input" min="0" step="1" value="5" />
+					</div>
+
+					<div class="field">
+						<label>Number of Staves:</label>
+						<input type="number" id="numStaves" min="1" value="5" />
+					</div>
+				</div>
+				<div class="four fields">
+					<div class="field">
+						<label>Staves Margin (mm):</label>
+						<input type="number" id="stavesMargin" min="0" step="1" value="" />
+					</div>
+
+					<div class="ui inline field" style="display: flex; align-items: center">
+						<div class="ui big checkbox">
+							<input type="checkbox" id="autoStaveMargin" />
+							<label>Auto stave margin</label>
+						</div>
+					</div>
+					<div class="field">
+						<label>Line Width (mm):</label>
+						<input type="number" id="lineWidth" class="ui input" min="0" step="0.1" value="0.1" />
+					</div>
+				</div>
+
+				<button class="ui primary button" onclick="parseFormData()">Generate Music Sheet</button>
+			</div>
+		</div>
+
+		<!-- Include jsPDF library -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+		<script>
+			// Function to set values for page size select
+			function setPageSizeOptions() {
+				const pageSizeSelect = document.getElementById('pageSizeSelect');
+				const pageSizes = {
+					A5: { width: 148.0, height: 210.0 },
+					'A5 (landscape)': { width: 210.0, height: 140.8 },
+					A4: { width: 210.0, height: 297.0 },
+					'A4 (landscape)': { width: 297.0, height: 210.0 },
+					A3: { width: 297.0, height: 420.0 },
+					'A3 (landscape)': { width: 420.0, height: 297 },
+					Letter: { width: 215.9, height: 279.4 },
+					'Letter (landscape)': { width: 279.4, height: 215.9 }
+				};
+
+				for (const size in pageSizes) {
+					const option = document.createElement('option');
+					option.value = size;
+					option.textContent = size;
+					pageSizeSelect.appendChild(option);
+				}
+
+				const pageWidthInput = document.getElementById('pageWidth');
+				const pageHeightInput = document.getElementById('pageHeight');
+
+				// Event listener for page size select
+				pageSizeSelect.addEventListener('change', function () {
+					const selectedSize = pageSizeSelect.value;
+					if (selectedSize !== 'custom') {
+						pageWidthInput.value = pageSizes[selectedSize].width;
+						pageHeightInput.value = pageSizes[selectedSize].height;
+						pageWidthInput.parentElement.classList.add('disabled');
+						pageHeightInput.parentElement.classList.add('disabled');
+					} else {
+						pageWidthInput.value = '';
+						pageHeightInput.value = '';
+						pageWidthInput.parentElement.classList.remove('disabled');
+						pageHeightInput.parentElement.classList.remove('disabled');
+					}
+				});
+			}
+
+			// Function to set values for stave size select
+			function setStaveSizeOptions() {
+				const staveSizeSelect = document.getElementById('staveSizeSelect');
+				const staveSizes = {
+					9.2: 'Size 0: 9.2 mm',
+					8.3: 'Size 1: 8.3 mm',
+					7.4: 'Size 2: 7.4 mm',
+					'7.0': 'Size 3: 7.0 mm',
+					6.5: 'Size 4: 6.5 mm',
+					'6.0': 'Size 5: 6.0 mm',
+					5.5: 'Size 6: 5.5 mm',
+					4.8: 'Size 7: 4.8 mm',
+					3.7: 'Size 8: 3.7 mm'
+				};
+
+				for (const size in staveSizes) {
+					const option = document.createElement('option');
+					option.value = size;
+					option.textContent = staveSizes[size];
+					staveSizeSelect.appendChild(option);
+				}
+
+				const staveSizeInput = document.getElementById('staveSize');
+
+				// Event listener for stave size select
+				staveSizeSelect.addEventListener('change', function () {
+					const selectedSize = staveSizeSelect.value;
+
+					if (selectedSize !== 'custom') {
+						staveSizeInput.value = selectedSize;
+						staveSizeInput.parentElement.classList.add('disabled');
+					} else {
+						staveSizeInput.value = '';
+						staveSizeInput.parentElement.classList.remove('disabled');
+					}
+				});
+			}
+
+			// Function to set auto margin if checkbox is selected
+			function setAutoMarginsCheckbox() {
+				const checkbox = document.getElementById('autoStaveMargin');
+				const staveMarginInput = document.getElementById('stavesMargin');
+
+				checkbox.addEventListener('change', function () {
+					if (this.checked) {
+						staveMarginInput.value = '';
+						staveMarginInput.parentElement.classList.add('disabled');
+					} else {
+						staveMarginInput.value = '';
+						staveMarginInput.parentElement.classList.remove('disabled');
+					}
+				});
+			}
+
+			// Call setPageSizeOptions and setStaveSizeOptions functions when the page loads
+			window.onload = function () {
+				setPageSizeOptions();
+				setStaveSizeOptions();
+				setAutoMarginsCheckbox();
+			};
+
+			function parseFormData() {
+				const pageSizeSelect = document.getElementById('pageSizeSelect');
+				const pageWidthInput = document.getElementById('pageWidth');
+				const pageHeightInput = document.getElementById('pageHeight');
+				const marginTopInput = document.getElementById('marginTop');
+				const marginRightInput = document.getElementById('marginRight');
+				const marginBottomInput = document.getElementById('marginBottom');
+				const marginLeftInput = document.getElementById('marginLeft');
+				const staveSizeInput = document.getElementById('staveSize');
+
+				let pageWidth, pageHeight, marginTop, marginRight, marginBottom, marginLeft;
+
+				// dimenstions page
+
+				pageWidth = parseFloat(pageWidthInput.value);
+				pageHeight = parseFloat(pageHeightInput.value);
+
+				marginTop = parseFloat(marginTopInput.value);
+				marginRight = parseFloat(marginRightInput.value);
+				marginBottom = parseFloat(marginBottomInput.value);
+				marginLeft = parseFloat(marginLeftInput.value);
+
+				const staveSize = parseFloat(document.getElementById('staveSize').value);
+				const numStaves = parseInt(document.getElementById('numStaves').value);
+				const stavesMargin = parseFloat(document.getElementById('stavesMargin').value) || null;
+				const lineWidth = parseFloat(document.getElementById('lineWidth').value);
+
+				// console.log(`
+				//          pageWidth:${pageWidth}
+				//          pageHeight:${pageHeight}
+				//          marginTop:${marginTop}
+				//          marginBottom:${marginBottom}
+				//          marginRight: ${marginRight}
+				//          marginLeft: ${marginLeft}
+				//          staveSize: ${staveSize}
+				//          numStaves: ${numStaves}
+				//          stavesMargin ${stavesMargin}
+				//          lineWidth: ${lineWidth}`);
+				// Now you have all the necessary data to generate the music sheet
+				generateMusicSheet(pageWidth, pageHeight, marginTop, marginRight, marginBottom, marginLeft, staveSize, numStaves, stavesMargin, lineWidth);
+			}
+
+			function generateMusicSheet(pageWidth, pageHeight, marginTop, marginRight, marginBottom, marginLeft, staveSize, numStaves, stavesMargin, lineWidth) {
+				const staves = calculateStavesLayout(pageWidth, pageHeight, marginTop, marginRight, marginBottom, marginLeft, staveSize, numStaves, stavesMargin);
+				const staveLines = calculateStaveLinesLayout(staves);
+
+				let orientation = 'portrait';
+				if (pageWidth > pageHeight) {
+					orientation = 'landscape';
+				}
+
+				const doc = new jspdf.jsPDF({
+					orientation: orientation,
+					unit: 'mm',
+					format: [pageWidth, pageHeight]
+				});
+
+				for (let i = 0; i < staveLines.length; i++) {
+					const line = staveLines[i];
+					doc.setLineWidth(lineWidth);
+					doc.line(line.x1, line.y1, line.x2, line.y2);
+				}
+
+				const filename = numStaves + '_staves-' + 'page' + pageWidth + 'x' + pageHeight + 'mm-' + orientation + '.pdf';
+
+				doc.save(filename);
+			}
+
+			function calculateStavesLayout(pageWidth, pageHeight, marginTop, marginRight, marginBottom, marginLeft, staveSize, numStaves, stavesMargin) {
+				const staves = [];
+				const totalStavesHeight = staveSize * numStaves;
+				let marginBetweenStaves;
+
+				if (stavesMargin === null) {
+					marginBetweenStaves = (pageHeight - totalStavesHeight - marginTop - marginBottom) / (numStaves - 1);
+				} else {
+					marginBetweenStaves = stavesMargin;
+				}
+
+				let yPos = marginTop;
+				for (let i = 0; i < numStaves; i++) {
+					staves.push({
+						x1: marginLeft,
+						y1: yPos,
+						x2: pageWidth - marginRight,
+						y2: yPos + staveSize
+					});
+					yPos += staveSize + marginBetweenStaves;
+				}
+
+				return staves;
+			}
+
+			function calculateStaveLinesLayout(staves, numLines = 5) {
+				const staveLines = [];
+				for (let i = 0; i < staves.length; i++) {
+					const stave = staves[i];
+					const lineSpacing = (stave.y2 - stave.y1) / (numLines - 1); // there are four fields
+					for (let j = 0; j < numLines; j++) {
+						staveLines.push({
+							x1: stave.x1,
+							y1: stave.y1 + j * lineSpacing,
+							x2: stave.x2,
+							y2: stave.y1 + j * lineSpacing
+						});
+					}
+				}
+				return staveLines;
+			}
+		</script>
+		<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-0KR6L4GCFC"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-0KR6L4GCFC');
+</script>
+
+	</body>
+</html>

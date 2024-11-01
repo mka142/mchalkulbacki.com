@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Golden Chord calculator</title>
+    <link rel="stylesheet" href="https://unpkg.com/mvp.css" />
+    <link rel="stylesheet" href="../static/css/mvp-theme.css" />
+    <link rel="stylesheet" href="../static/fonts/main.css" />
+  </head>
+  <body>
+    <header><h1>Golden Chord calculator</h1></header>
+    <main>
+      <form>
+        <p>
+          Enter the first and last notes of the chord to calculate the golden
+          division. <i>(e.g A4, C#5, Fb3)</i>
+        </p>
+        <label for="startNote">First note</label>
+        <input name="startNote" type="text" />
+
+        <label for="endNote">Last note</label>
+        <input name="endNote" type="text" />
+      </form>
+
+      <!-- Container for the chord -->
+      <div id="chord-container" style="background: #fff"></div>
+      <!-- Container for the pitch information -->
+      <div id="pitch-info"></div>
+      <footer>
+        <a href="../index.html">Back to the index</a>
+      </footer>
+    </main>
+  </body>
+  <!-- VexFlow Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vexflow/1.2.93/vexflow-min.js"></script>
+  <!-- MathJax Library -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script
+    id="MathJax-script"
+    async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+  ></script>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [["\\(", "\\)"]],
+        displayMath: [["\\[", "\\]"]],
+        scale: 3, // Increase the scale to make the font larger
+      },
+    };
+  </script>
+  <script src="./static/decimal.js"></script>
+  <script src="./static/main.js"></script>
+  <script>
+    // Function to render the chord using VexFlow
+    function renderChord(
+      startNote,
+      goldenNote,
+      endNote,
+      lowestOctave,
+      highestOctave,
+      goldenNoteInfo,
+      goldenFreq
+    ) {
+      const VF = Vex.Flow;
+      const div = document.getElementById("chord-container");
+      div.innerHTML = ""; // Clear previous rendering
+      const renderer = new VF.Renderer(div, VF.Renderer.Backends.SVG);
+
+      renderer.resize(500, 300);
+      const context = renderer.getContext();
+      const staveBass = new VF.Stave(10, 140, 400);
+      const staveTreble = new VF.Stave(10, 40, 400);
+
+      staveBass.addClef("bass").setContext(context).draw();
+      staveTreble.addClef("treble").setContext(context).draw();
+
+      const input = [startNote, goldenNote, endNote];
+
+      const bassNotes = input.filter(
+        (note) => note.octave * 12 + note.noteIndex < 43
+      );
+      const trebleNotes = input.filter(
+        (note) => note.octave * 12 + note.noteIndex >= 43
+      );
+      function setNotes(inputNotes, clef) {
+        const keys = inputNotes.map((note) => {
+          return `${note.note}/${note.octave}`;
+        });
+        console.log(keys);
+        const notes = [
+          new VF.StaveNote({
+            clef: clef,
+            keys: keys,
+            duration: "q",
+          }),
+        ];
+        // Add accidentals if needed
+        inputNotes.forEach((note, index) => {
+          if (note.noteString.includes("#")) {
+            notes[0].addAccidental(index, new VF.Accidental("#"));
+          } else if (note.noteString.includes("b")) {
+            notes[0].addAccidental(index, new VF.Accidental("b"));
+          }
+        });
+        const voice = new VF.Voice({ num_beats: 1, beat_value: 4 });
+        voice.addTickables(notes);
+        return voice;
+      }
+      const formatter = new VF.Formatter();
+      if (bassNotes.length > 0) {
+        const voiceBass = setNotes(bassNotes, "bass");
+        formatter.joinVoices([voiceBass]);
+        formatter.format([voiceBass], 400);
+        voiceBass.draw(context, staveBass);
+      }
+      if (trebleNotes.length > 0) {
+        const voiceTreble = setNotes(trebleNotes, "treble");
+        formatter.joinVoices([voiceTreble]);
+        formatter.format([voiceTreble], 400);
+        voiceTreble.draw(context, staveTreble);
+      }
+    }
+
+    function displayPitchInformation(
+      startNote,
+      goldenNote,
+      endNote,
+      lowestOctave,
+      highestOctave,
+      goldenNoteInfo,
+      goldenFreq
+    ) {
+      const startNoteString = startNote.noteString.replace(/#/g, "\\#");
+      const goldenNoteString = goldenNote.noteString.replace(/#/g, "\\#");
+      const endNoteString = endNote.noteString.replace(/#/g, "\\#");
+      // Display pitch information
+      const pitchInfoDiv = document.getElementById("pitch-info");
+      pitchInfoDiv.innerHTML =
+        `
+      <p> First note Frequency: ${startNote.freq().toFixed(3)} Hz</p>
+      <p> End note Frequency: ${endNote.freq().toFixed(3)} Hz</p>
+      <hr>
+        <p>Golden Frequency: ${goldenFreq.toFixed(3)} Hz</p>
+        <p> Golden Note Frequency: ${goldenNote.freq().toFixed(3)} Hz <b>(${
+          goldenNote.noteString
+        })</b></p>
+        <p>Golden Note Offset: ${goldenNoteInfo.offset.toFixed(3)} cents</p>
+      <hr>` +
+        `
+        <p>Proportions (with approximation to the equal temperament):</p>
+        <p style="font-size:2rem">
+           \\(\\frac{${endNoteString} - ${startNoteString}}{
+           ${goldenNoteString} - ${startNoteString}} =
+           \\frac{${endNote.freq().toFixed(3)} - ${startNote
+          .freq()
+          .toFixed(3)}}{${goldenNote.freq().toFixed(3)} - ${endNote
+          .freq()
+          .toFixed(3)}} \\approx ${endNote
+          .freq()
+          .minus(startNote.freq())
+          .dividedBy(goldenNote.freq().minus(startNote.freq()))
+          .toFixed(3)}\\)
+        </p>
+        <p style="font-size:2rem">
+           \\(\\frac{${goldenNoteString} - ${startNoteString}}{
+           ${endNoteString} - ${goldenNoteString}} =
+           \\frac{${goldenNote.freq().toFixed(3)} - ${startNote
+          .freq()
+          .toFixed(3)}}{${endNote.freq().toFixed(3)} - ${goldenNote
+          .freq()
+          .toFixed(3)}} \\approx ${goldenNote
+          .freq()
+          .minus(startNote.freq())
+          .dividedBy(endNote.freq().minus(goldenNote.freq()))
+          .toFixed(3)}\\)
+        </p>
+      `;
+
+      MathJax.typeset(); // Re-render MathJax content
+    }
+
+    // Function to handle form input changes
+    function handleInputChange() {
+      const startNoteInput = document.querySelector('input[name="startNote"]');
+      const endNoteInput = document.querySelector('input[name="endNote"]');
+      const startNoteValue = startNoteInput.value;
+      const endNoteValue = endNoteInput.value;
+
+      if (startNoteValue && endNoteValue) {
+        try {
+          const startNote = new Note(startNoteValue.toUpperCase());
+          const endNote = new Note(endNoteValue.toUpperCase());
+
+          const startFreq = startNote.freq();
+          const endFreq = endNote.freq();
+
+          const goldenFreq = getGoldenDivisionFreq(startFreq, endFreq);
+          const goldenNote = getNoteFromFreq(goldenFreq);
+
+          const lowestOctave = Math.min(
+            startNote.octave,
+            goldenNote.note.octave,
+            endNote.octave
+          );
+          const highestOctave = Math.max(
+            startNote.octave,
+            goldenNote.note.octave,
+            endNote.octave
+          );
+
+          renderChord(
+            startNote,
+            goldenNote.note,
+            endNote,
+            lowestOctave,
+            highestOctave,
+            goldenNote,
+            goldenFreq
+          );
+          displayPitchInformation(
+            startNote,
+            goldenNote.note,
+            endNote,
+            lowestOctave,
+            highestOctave,
+            goldenNote,
+            goldenFreq
+          );
+        } catch (error) {
+          console.error("Invalid note input:", error);
+        }
+      }
+    }
+
+    // Add event listeners to form inputs
+    document
+      .querySelector('input[name="startNote"]')
+      .addEventListener("input", handleInputChange);
+    document
+      .querySelector('input[name="endNote"]')
+      .addEventListener("input", handleInputChange);
+  </script>
+</html>
